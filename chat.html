@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chatbot Interface</title>
+
+  <!-- Roboto font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <!-- Link CSS -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <div class="app">
+    <!-- Left panel: Document Management -->
+    <aside id="doc-panel">
+      <h2>Document Management</h2>
+
+      <div class="section">
+        <label for="retrieval-method"><strong>Retrieval Method</strong></label>
+        <select id="retrieval-method">
+          <option value="semantic">Semantic</option>
+          <option value="tfidf">TF-IDF</option>
+        </select>
+      </div>
+
+      <div class="section">
+        <form id="upload-form">
+          <label for="file-input"><strong>Upload Document</strong></label>
+          <input id="file-input" type="file" />
+          <button id="upload-btn" type="button">Upload</button>
+        </form>
+      </div>
+
+      <div class="section">
+        <h3>Uploaded Docs</h3>
+        <ul id="uploaded-docs">
+          <!-- future list items -->
+        </ul>
+      </div>
+    </aside>
+
+    <!-- Right panel: Chat -->
+    <main id="chat-container">
+      <header class="chat-header">
+        <h2>AI Chat</h2>
+      </header>
+
+      <section id="messages" aria-live="polite" aria-label="Chat messages">
+        <!-- messages will appear here -->
+      </section>
+
+      <footer class="chat-input">
+        <input
+          id="user-input"
+          type="text"
+          placeholder="Type a message..."
+          autocomplete="off"
+        />
+        <button id="send-btn" type="button">Send</button>
+      </footer>
+    </main>
+  </div>
+
+  <!-- Link JS -->
+  <script src="script.js"></script>
+</body>
+</html>
