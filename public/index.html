@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chatbot Homepage</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="home-wrapper">
+    <div class="home-card">
+      <h1>Interactive AI Chatbot</h1>
+      <p class="home-description">
+        This chatbot lets participants talk with an AI assistant.
+        It also stores chat history and interaction events such as clicks, hover, and focus in MongoDB Atlas.
+      </p>
+
+      <label for="participant-id"><strong>Participant ID</strong></label>
+      <input
+        id="participant-id"
+        type="text"
+        placeholder="Enter your participant ID"
+        autocomplete="off"
+      />
+
+      <button id="start-btn" type="button">Start Chat</button>
+    </div>
+  </div>
+
+  <script src="home.js"></script>
+</body>
+</html>

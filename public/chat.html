@@ -5,20 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Chatbot Interface</title>
 
-  <!-- Roboto font -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 
-  <!-- Link CSS -->
   <link rel="stylesheet" href="style.css" />
 </head>
 
 <body>
   <div class="app">
-    <!-- Left panel: Document Management -->
     <aside id="doc-panel">
       <h2>Document Management</h2>
+
+      <div class="participant-badge" id="participant-display">Participant: </div>
 
       <div class="section">
         <label for="retrieval-method"><strong>Retrieval Method</strong></label>
@@ -38,21 +37,16 @@
 
       <div class="section">
         <h3>Uploaded Docs</h3>
-        <ul id="uploaded-docs">
-          <!-- future list items -->
-        </ul>
+        <ul id="uploaded-docs"></ul>
       </div>
     </aside>
 
-    <!-- Right panel: Chat -->
     <main id="chat-container">
       <header class="chat-header">
         <h2>AI Chat</h2>
       </header>
 
-      <section id="messages" aria-live="polite" aria-label="Chat messages">
-        <!-- messages will appear here -->
-      </section>
+      <section id="messages" aria-live="polite" aria-label="Chat messages"></section>
 
       <footer class="chat-input">
         <input
@@ -66,7 +60,6 @@
     </main>
   </div>
 
-  <!-- Link JS -->
   <script src="script.js"></script>
 </body>
 </html>
