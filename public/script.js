@@ -35,18 +35,54 @@ function addMessage(sender, text) {
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
+function addEvidenceBlock(retrievedDocuments) {
+  if (!retrievedDocuments || retrievedDocuments.length === 0) {
+    addMessage("System", "No evidence retrieved.");
+    return;
+  }
+
+  retrievedDocuments.forEach((doc, index) => {
+    addMessage(
+      "System",
+      `Evidence ${index + 1} | Doc: ${doc.docName} | Chunk: ${doc.chunkIndex} | Score: ${Number(doc.relevanceScore).toFixed(4)}`
+    );
+    addMessage("System", doc.chunkText);
+  });
+}
+
+function addConfidenceBlock(confidenceMetrics) {
+  if (!confidenceMetrics) return;
+
+  const overall =
+    confidenceMetrics.overallConfidence !== undefined
+      ? confidenceMetrics.overallConfidence
+      : "N/A";
+
+  const evidenceStrength =
+    confidenceMetrics.evidenceStrength !== undefined
+      ? confidenceMetrics.evidenceStrength
+      : "N/A";
+
+  const method = confidenceMetrics.retrievalMethod || "N/A";
+
+  addMessage(
+    "System",
+    `Confidence | overall: ${overall} | evidence strength: ${evidenceStrength} | method: ${method}`
+  );
+}
+
 async function logEvent(eventType, elementName) {
   try {
     await fetch("/log-event", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/json"
       },
       body: JSON.stringify({
         participantID,
         eventType,
-        elementName,
-      }),
+        elementName
+      })
     });
   } catch (error) {
     console.error("Error logging event:", error);
@@ -58,9 +94,9 @@ async function loadHistory() {
     const response = await fetch("/history", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/json"
       },
-      body: JSON.stringify({ participantID }),
+      body: JSON.stringify({ participantID })
     });
 
     const data = await response.json();
@@ -69,6 +105,14 @@ async function loadHistory() {
       data.history.forEach((item) => {
         addMessage("User", item.userInput);
         addMessage("Bot", item.botResponse);
+
+        if (item.retrievedDocuments && item.retrievedDocuments.length > 0) {
+          addEvidenceBlock(item.retrievedDocuments);
+        }
+
+        if (item.confidenceMetrics) {
+          addConfidenceBlock(item.confidenceMetrics);
+        }
       });
     }
   } catch (error) {
@@ -77,36 +121,100 @@ async function loadHistory() {
   }
 }
 
+async function loadDocuments() {
+  try {
+    const response = await fetch("/documents");
+    const docs = await response.json();
+
+    uploadedDocs.innerHTML = "";
+
+    docs.forEach((doc) => {
+      const item = document.createElement("li");
+      item.textContent = `${doc.filename} (${doc.processingStatus})`;
+      uploadedDocs.appendChild(item);
+    });
+  } catch (error) {
+    console.error("Error loading documents:", error);
+    addMessage("System", "Could not load document list.");
+  }
+}
+
+async function uploadDocument() {
+  const file = fileInput.files[0];
+
+  if (!file) {
+    addMessage("System", "No file selected.");
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("document", file);
+
+  try {
+    addMessage("System", `Uploading document: ${file.name}`);
+
+    const response = await fetch("/upload-document", {
+      method: "POST",
+      body: formData
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      addMessage("System", `Upload failed: ${data.error || "Unknown error"}`);
+      return;
+    }
+
+    addMessage(
+      "System",
+      `Upload complete: ${data.filename} (${data.chunkCount} chunks)`
+    );
+
+    fileInput.value = "";
+    await loadDocuments();
+  } catch (error) {
+    console.error("Error uploading document:", error);
+    addMessage("System", "Error uploading document.");
+  }
+}
+
 async function sendMessage() {
-  const message = inputField.value.trim();
+  const input = inputField.value.trim();
   const retrievalMethod = retrievalDropdown.value;
 
-  if (message === "") return;
+  if (input === "") return;
 
-  addMessage("User", message);
+  addMessage("User", input);
   inputField.value = "";
 
   try {
     const response = await fetch("/chat", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/json"
       },
       body: JSON.stringify({
         participantID,
-        message,
-        retrievalMethod,
-      }),
+        input,
+        retrievalMethod
+      })
     });
 
     const data = await response.json();
 
-    if (data.botReply) {
-      addMessage("Bot", data.botReply);
-    } else if (data.error) {
-      addMessage("Bot", `Error: ${data.error}`);
-    } else {
-      addMessage("Bot", "No response received.");
+    if (!response.ok) {
+      addMessage("Bot", `Error: ${data.error || "Unknown server error."}`);
+      return;
+    }
+
+    addMessage("Bot", data.botResponse || "No response received.");
+
+    if (data.retrievedDocuments) {
+      addEvidenceBlock(data.retrievedDocuments);
+    }
+
+    if (data.confidenceMetrics) {
+      addConfidenceBlock(data.confidenceMetrics);
     }
   } catch (error) {
     console.error("Error:", error);
@@ -116,13 +224,13 @@ async function sendMessage() {
 
 sendBtn.addEventListener("click", async () => {
   await logEvent("click", "send-btn");
-  sendMessage();
+  await sendMessage();
 });
 
 inputField.addEventListener("keydown", async (event) => {
   if (event.key === "Enter") {
     await logEvent("keypress", "user-input-enter");
-    sendMessage();
+    await sendMessage();
   }
 });
 
@@ -130,7 +238,7 @@ inputField.addEventListener("focus", () => {
   logEvent("focus", "user-input");
 });
 
-sendBtn.addEventListener("mouseover", () => {
+sendBtn.addEventListener("mouseenter", () => {
   logEvent("hover", "send-btn");
 });
 
@@ -138,30 +246,19 @@ retrievalDropdown.addEventListener("focus", () => {
   logEvent("focus", "retrieval-method");
 });
 
-retrievalDropdown.addEventListener("change", (event) => {
+retrievalDropdown.addEventListener("change", async (event) => {
   const method = event.target.value;
   addMessage("System", `Retrieval method changed to: ${method}`);
-  logEvent("change", "retrieval-method");
+  await logEvent("change", "retrieval-method");
 });
 
 uploadBtn.addEventListener("click", async () => {
   await logEvent("click", "upload-btn");
-
-  const file = fileInput.files[0];
-
-  if (!file) {
-    addMessage("System", "No file selected.");
-    return;
-  }
-
-  const item = document.createElement("li");
-  item.textContent = file.name;
-  uploadedDocs.appendChild(item);
-
-  addMessage("System", `Selected file: ${file.name}`);
+  await uploadDocument();
 });
 
 window.addEventListener("load", async () => {
   await logEvent("load", "chat-page");
+  await loadDocuments();
   await loadHistory();
 });
