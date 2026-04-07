@@ -6,15 +6,42 @@ const uploadBtn = document.getElementById("upload-btn");
 const fileInput = document.getElementById("file-input");
 const uploadedDocs = document.getElementById("uploaded-docs");
 const participantDisplay = document.getElementById("participant-display");
+const systemDisplay = document.getElementById("system-display");
 
-const participantID = localStorage.getItem("participantID");
+const MAX_HISTORY = 5;
+let conversationHistory = [];
+
+const urlParams = new URLSearchParams(window.location.search);
+
+let participantID = urlParams.get("participantID");
+let systemID = urlParams.get("systemID");
+
+if (!participantID) {
+  participantID = localStorage.getItem("participantID");
+}
+
+if (!systemID) {
+  systemID = localStorage.getItem("systemID");
+}
 
 if (!participantID) {
   alert("No participant ID found. Please enter it on the homepage first.");
   window.location.href = "/";
 }
 
+if (!systemID) {
+  const numericID = parseInt(participantID, 10);
+  systemID = !Number.isNaN(numericID) && numericID % 2 === 0 ? 2 : 1;
+}
+
+localStorage.setItem("participantID", participantID);
+localStorage.setItem("systemID", String(systemID));
+
 participantDisplay.textContent = `Participant: ${participantID}`;
+systemDisplay.textContent =
+  Number(systemID) === 1
+    ? "System: 1 (Baseline)"
+    : "System: 2 (Alternate Placeholder)";
 
 function addMessage(sender, text) {
   const message = document.createElement("div");
@@ -37,7 +64,6 @@ function addMessage(sender, text) {
 
 function addEvidenceBlock(retrievedDocuments) {
   if (!retrievedDocuments || retrievedDocuments.length === 0) {
-    addMessage("System", "No evidence retrieved.");
     return;
   }
 
@@ -80,6 +106,7 @@ async function logEvent(eventType, elementName) {
       },
       body: JSON.stringify({
         participantID,
+        systemID: Number(systemID),
         eventType,
         elementName
       })
@@ -89,19 +116,24 @@ async function logEvent(eventType, elementName) {
   }
 }
 
-async function loadHistory() {
+async function loadConversationHistory() {
   try {
     const response = await fetch("/history", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ participantID })
+      body: JSON.stringify({
+        participantID,
+        limit: MAX_HISTORY
+      })
     });
 
     const data = await response.json();
 
     if (data.history && Array.isArray(data.history)) {
+      conversationHistory = [];
+
       data.history.forEach((item) => {
         addMessage("User", item.userInput);
         addMessage("Bot", item.botResponse);
@@ -113,7 +145,19 @@ async function loadHistory() {
         if (item.confidenceMetrics) {
           addConfidenceBlock(item.confidenceMetrics);
         }
+
+        conversationHistory.push({
+          role: "user",
+          content: item.userInput
+        });
+
+        conversationHistory.push({
+          role: "assistant",
+          content: item.botResponse
+        });
       });
+
+      conversationHistory = conversationHistory.slice(-MAX_HISTORY * 2);
     }
   } catch (error) {
     console.error("Error loading history:", error);
@@ -187,6 +231,8 @@ async function sendMessage() {
   addMessage("User", input);
   inputField.value = "";
 
+  const trimmedHistory = conversationHistory.slice(-MAX_HISTORY * 2);
+
   try {
     const response = await fetch("/chat", {
       method: "POST",
@@ -195,8 +241,10 @@ async function sendMessage() {
       },
       body: JSON.stringify({
         participantID,
+        systemID: Number(systemID),
         input,
-        retrievalMethod
+        retrievalMethod,
+        conversationHistory: trimmedHistory
       })
     });
 
@@ -216,6 +264,18 @@ async function sendMessage() {
     if (data.confidenceMetrics) {
       addConfidenceBlock(data.confidenceMetrics);
     }
+
+    conversationHistory.push({
+      role: "user",
+      content: input
+    });
+
+    conversationHistory.push({
+      role: "assistant",
+      content: data.botResponse || "No response received."
+    });
+
+    conversationHistory = conversationHistory.slice(-MAX_HISTORY * 2);
   } catch (error) {
     console.error("Error:", error);
     addMessage("Bot", "Error connecting to server.");
@@ -229,6 +289,7 @@ sendBtn.addEventListener("click", async () => {
 
 inputField.addEventListener("keydown", async (event) => {
   if (event.key === "Enter") {
+    event.preventDefault();
     await logEvent("keypress", "user-input-enter");
     await sendMessage();
   }
@@ -260,5 +321,5 @@ uploadBtn.addEventListener("click", async () => {
 window.addEventListener("load", async () => {
   await logEvent("load", "chat-page");
   await loadDocuments();
-  await loadHistory();
+  await loadConversationHistory();
 });

@@ -43,7 +43,13 @@ const ConfidenceMetricsSchema = new mongoose.Schema(
 const interactionSchema = new mongoose.Schema({
   participantID: {
     type: String,
-    required: true
+    required: true,
+    index: true
+  },
+  systemID: {
+    type: Number,
+    required: true,
+    default: 1
   },
   userInput: {
     type: String,

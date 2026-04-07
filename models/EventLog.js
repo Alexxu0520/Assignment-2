@@ -4,19 +4,25 @@ const eventLogSchema = new mongoose.Schema({
   participantID: {
     type: String,
     required: true,
+    index: true
+  },
+  systemID: {
+    type: Number,
+    required: true,
+    default: 1
   },
   eventType: {
     type: String,
-    required: true,
+    required: true
   },
   elementName: {
     type: String,
-    required: true,
+    required: true
   },
   timestamp: {
     type: Date,
-    default: Date.now,
-  },
+    default: Date.now
+  }
 });
 
 module.exports = mongoose.model("EventLog", eventLogSchema);

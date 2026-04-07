@@ -20,15 +20,19 @@
         It also stores chat history and interaction events such as clicks, hover, and focus in MongoDB Atlas.
       </p>
 
-      <label for="participant-id"><strong>Participant ID</strong></label>
-      <input
-        id="participant-id"
-        type="text"
-        placeholder="Enter your participant ID"
-        autocomplete="off"
-      />
+      <form id="participant-form">
+        <label for="participant-id"><strong>Participant ID</strong></label>
+        <input
+          id="participant-id"
+          name="participantID"
+          type="text"
+          placeholder="Enter your participant ID"
+          autocomplete="off"
+          required
+        />
 
-      <button id="start-btn" type="button">Start Chat</button>
+        <button id="start-btn" type="submit">Start Chat</button>
+      </form>
     </div>
   </div>
 

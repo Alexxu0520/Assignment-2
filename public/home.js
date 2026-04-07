@@ -1,20 +1,24 @@
+const participantForm = document.getElementById("participant-form");
 const participantInput = document.getElementById("participant-id");
-const startBtn = document.getElementById("start-btn");
 
-startBtn.addEventListener("click", () => {
+participantForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+
   const participantID = participantInput.value.trim();
 
   if (!participantID) {
-    alert("Please enter a Participant ID.");
+    alert("Please enter your Participant ID.");
     return;
   }
 
   localStorage.setItem("participantID", participantID);
-  window.location.href = "/chat.html";
-});
 
-participantInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") {
-    startBtn.click();
-  }
+  const numericID = parseInt(participantID, 10);
+  const systemID = !Number.isNaN(numericID) && numericID % 2 === 0 ? 2 : 1;
+
+  localStorage.setItem("systemID", String(systemID));
+
+  window.location.href = `/chat.html?participantID=${encodeURIComponent(
+    participantID
+  )}&systemID=${systemID}`;
 });

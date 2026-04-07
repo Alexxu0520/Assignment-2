@@ -22,6 +22,7 @@ const confidenceCalculator = require("./services/confidenceCalculator");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const MAX_HISTORY = 5;
 
 const uploadsDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadsDir)) {
@@ -48,7 +49,7 @@ app.get("/chat.html", (req, res) => {
 
 app.post("/log-event", async (req, res) => {
   try {
-    const { participantID, eventType, elementName } = req.body;
+    const { participantID, systemID, eventType, elementName } = req.body;
 
     if (!participantID || !eventType || !elementName) {
       return res.status(400).json({
@@ -58,6 +59,7 @@ app.post("/log-event", async (req, res) => {
 
     const eventLog = new EventLog({
       participantID,
+      systemID: Number(systemID) || 1,
       eventType,
       elementName,
       timestamp: new Date()
@@ -126,9 +128,39 @@ app.get("/documents", async (req, res) => {
   }
 });
 
+app.post("/history", async (req, res) => {
+  try {
+    const { participantID, limit = MAX_HISTORY } = req.body;
+
+    if (!participantID) {
+      return res.status(400).json({
+        error: "participantID is required."
+      });
+    }
+
+    const history = await Interaction.find({ participantID })
+      .sort({ timestamp: -1 })
+      .limit(Number(limit))
+      .lean();
+
+    res.json({ history: history.reverse() });
+  } catch (error) {
+    console.error("Error in /history:", error);
+    res.status(500).json({
+      error: "Failed to load history."
+    });
+  }
+});
+
 app.post("/chat", async (req, res) => {
   try {
-    const { participantID, input, retrievalMethod } = req.body;
+    const {
+      participantID,
+      systemID,
+      input,
+      retrievalMethod,
+      conversationHistory = []
+    } = req.body;
 
     if (!participantID || !input || !input.trim()) {
       return res.status(400).json({
@@ -136,9 +168,44 @@ app.post("/chat", async (req, res) => {
       });
     }
 
+    const normalizedSystemID = Number(systemID) || 1;
     const method = retrievalMethod || "semantic";
 
-    const retrievedDocuments = await retrievalService.retrieve(input, {
+    let botResponse = "";
+    let retrievedDocuments = [];
+    let confidenceMetrics = {
+      overallConfidence: 0,
+      evidenceStrength: 0,
+      retrievalMethod: method
+    };
+
+    if (normalizedSystemID === 2) {
+      botResponse =
+        `System 2 placeholder active. ` +
+        `Participant ${participantID} is routed correctly to the alternate system. ` +
+        `You said: "${input}"`;
+
+      const interaction = new Interaction({
+        participantID,
+        systemID: normalizedSystemID,
+        userInput: input,
+        botResponse,
+        retrievalMethod: method,
+        retrievedDocuments: [],
+        confidenceMetrics
+      });
+
+      await interaction.save();
+
+      return res.json({
+        botResponse,
+        retrievedDocuments: [],
+        confidenceMetrics,
+        systemID: normalizedSystemID
+      });
+    }
+
+    retrievedDocuments = await retrievalService.retrieve(input, {
       method,
       topK: 3,
       minScore: 0
@@ -153,16 +220,29 @@ app.post("/chat", async (req, res) => {
           .join("\n\n")
       : "No relevant evidence retrieved.";
 
+    const historyText =
+      Array.isArray(conversationHistory) && conversationHistory.length > 0
+        ? conversationHistory
+            .slice(-MAX_HISTORY * 2)
+            .map((msg) => `${msg.role === "assistant" ? "Assistant" : "User"}: ${msg.content}`)
+            .join("\n")
+        : "No prior conversation history.";
+
     const augmentedPrompt = `
 You are a helpful AI chatbot for a class project.
-Answer the user's question using the retrieved evidence below.
+
+Use the retrieved evidence below whenever possible.
+Use the conversation history to maintain continuity.
 If the evidence is insufficient, say so clearly.
-Keep the answer clear, short, and grounded in the evidence.
+Keep the answer clear, short, and grounded.
+
+Conversation History:
+${historyText}
 
 Retrieved Evidence:
 ${evidenceText}
 
-User Question:
+Current User Question:
 ${input}
 `;
 
@@ -171,10 +251,10 @@ ${input}
       input: augmentedPrompt
     });
 
-    const botResponse =
+    botResponse =
       response.output_text || "Sorry, I could not generate a response.";
 
-    const confidenceMetrics = confidenceCalculator.calculate({
+    confidenceMetrics = confidenceCalculator.calculate({
       retrievedDocs: retrievedDocuments,
       retrievalMethod: method,
       responseLogprobs: null
@@ -182,6 +262,7 @@ ${input}
 
     const interaction = new Interaction({
       participantID,
+      systemID: normalizedSystemID,
       userInput: input,
       botResponse,
       retrievalMethod: method,
@@ -204,35 +285,13 @@ ${input}
         chunkText: doc.chunkText,
         relevanceScore: doc.relevanceScore
       })),
-      confidenceMetrics
+      confidenceMetrics,
+      systemID: normalizedSystemID
     });
   } catch (error) {
     console.error("Error in /chat:", error);
     res.status(500).json({
       error: "Server error while processing chat."
-    });
-  }
-});
-
-app.post("/history", async (req, res) => {
-  try {
-    const { participantID } = req.body;
-
-    if (!participantID) {
-      return res.status(400).json({
-        error: "participantID is required."
-      });
-    }
-
-    const history = await Interaction.find({ participantID }).sort({
-      timestamp: 1
-    });
-
-    res.json({ history });
-  } catch (error) {
-    console.error("Error in /history:", error);
-    res.status(500).json({
-      error: "Failed to load history."
     });
   }
 });
